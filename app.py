@@ -20,6 +20,7 @@ log.setLevel(logging.ERROR)
 from packet_sniffer import start_sniffing
 from rule_engine import analyze_packet, load_config, save_config, get_default_config
 from logger import save_encrypted_alert, list_logs, read_and_decrypt_logs, LOG_DIR, ensure_logs_dir, delete_log, delete_all_logs
+from firewall_manager import ban_ip as fw_ban_ip, unban_ip as fw_unban_ip, is_admin as fw_is_admin
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'nids-secret-key-12345'
@@ -83,6 +84,7 @@ from encryption import encrypt_data, decrypt_data, SecurityException
 LOGIN_HISTORY_FILE = os.path.join(LOG_DIR, 'login_history.bin')
 BANNED_IPS_FILE = os.path.join(LOG_DIR, 'banned_ips.bin')
 FAILED_ATTEMPTS_FILE = os.path.join(LOG_DIR, 'failed_attempts.bin')
+FIREWALL_BANNED_IPS_FILE = os.path.join(LOG_DIR, 'firewall_banned_ips.bin')
 MAX_FAILED_ATTEMPTS = 3
 
 # Internal system secret for administrative files (allows checking bans before login)
@@ -125,6 +127,27 @@ def save_failed_attempts(attempts_dict):
             f.write(encrypted_data)
     except Exception as e:
         print(f"[-] Error saving failed attempts: {e}")
+
+def get_firewall_banned_ips():
+    """Return the dict of IPs banned at the Windows Firewall level."""
+    if not os.path.exists(FIREWALL_BANNED_IPS_FILE): return {}
+    try:
+        with open(FIREWALL_BANNED_IPS_FILE, 'rb') as f:
+            encrypted_data = f.read()
+            if not encrypted_data: return {}
+            decrypted_json = decrypt_data(encrypted_data, SYSTEM_SECRET)
+            return json.loads(decrypted_json)
+    except: return {}
+
+def save_firewall_banned_ips(fw_dict):
+    """Persist the firewall banned IPs dict (encrypted)."""
+    try:
+        json_data = json.dumps(fw_dict)
+        encrypted_data = encrypt_data(json_data, SYSTEM_SECRET)
+        with open(FIREWALL_BANNED_IPS_FILE, 'wb') as f:
+            f.write(encrypted_data)
+    except Exception as e:
+        print(f"[-] Error saving firewall banned IPs: {e}")
 
 def log_login_event(username, status, ip):
     """Logs a login attempt to an encrypted JSON file."""
@@ -197,7 +220,7 @@ def tab_route(tab):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    error = None
+    error = request.args.get('error')
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
@@ -246,9 +269,11 @@ def login():
                     "username": username or "Unknown"
                 }
                 save_banned_ips(banned)
-                return render_template('banned.html', reason="Too many wrong password attempts"), 403
+                # Redirect to login which will trigger the before_request ban check
+                return redirect(url_for('login'))
                 
-            error = f"Invalid username or password. ({count}/{MAX_FAILED_ATTEMPTS} attempts)"
+            error_msg = f"Invalid username or password. ({count}/{MAX_FAILED_ATTEMPTS} attempts)"
+            return redirect(url_for('login', error=error_msg))
     return render_template('login.html', error=error)
 
 @app.route('/logout')
@@ -637,6 +662,74 @@ def api_ban_manual():
     }
     save_banned_ips(banned)
     return jsonify({"success": True})
+
+# ── Firewall (Network-Level) Ban API ─────────────────────────────────────────
+
+@app.route('/api/firewall_banned_ips')
+def api_get_firewall_banned_ips():
+    if 'logged_in' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    return jsonify(get_firewall_banned_ips())
+
+@app.route('/api/firewall_ban_ip', methods=['POST'])
+def api_firewall_ban_ip():
+    try:
+        if 'logged_in' not in session:
+            return jsonify({"error": "Unauthorized"}), 401
+        
+        ip = request.json.get('ip')
+        reason = request.json.get('reason', 'Manually blocked at network level')
+        if not ip:
+            return jsonify({"error": "IP is required"}), 400
+
+        success, message = fw_ban_ip(ip)
+        if not success:
+            print(f"[*] Firewall Ban Error: {message}")
+            if "requires elevation" in message.lower() or "access is denied" in message.lower():
+                return jsonify({
+                    "error": "Administrator privileges required. Please restart the NIDS server as Administrator to use Firewall bans."
+                }), 403
+            return jsonify({"error": message}), 500
+
+        fw_banned = get_firewall_banned_ips()
+        fw_banned[ip] = {
+            "reason": reason,
+            "timestamp": datetime.now().strftime("%b %d, %Y • %I:%M %p"),
+            "message": message
+        }
+        save_firewall_banned_ips(fw_banned)
+        return jsonify({"success": True, "message": message})
+    except Exception as e:
+        print(f"[*] CRITICAL API ERROR: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/firewall_unban_ip', methods=['POST'])
+def api_firewall_unban_ip():
+    try:
+        if 'logged_in' not in session:
+            return jsonify({"error": "Unauthorized"}), 401
+            
+        ip = request.json.get('ip')
+        if not ip:
+            return jsonify({"error": "IP is required"}), 400
+
+        success, message = fw_unban_ip(ip)
+        if not success:
+            print(f"[*] Firewall Unban Error: {message}")
+            if "requires elevation" in message.lower() or "access is denied" in message.lower():
+                return jsonify({
+                    "error": "Administrator privileges required. Please restart the NIDS server as Administrator to remove Firewall bans."
+                }), 403
+            return jsonify({"error": message}), 500
+
+        fw_banned = get_firewall_banned_ips()
+        if ip in fw_banned:
+            del fw_banned[ip]
+            save_firewall_banned_ips(fw_banned)
+        return jsonify({"success": True, "message": message})
+    except Exception as e:
+        print(f"[*] CRITICAL API ERROR: {e}")
+        return jsonify({"error": str(e)}), 500
 
 def print_dashboard_banner():
     # Only print on the main process (not the reloader)

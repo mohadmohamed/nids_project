@@ -71,7 +71,7 @@ function showTab(tabName, shouldPushState = true) {
 
     if (tabName === 'history') loadLogFiles();
     if (tabName === 'login-history') loadLoginHistory();
-    if (tabName === 'banned-ips') loadBannedIPs();
+    if (tabName === 'banned-ips') { loadBannedIPs(); loadFirewallBannedIPs(); }
     if (tabName === 'settings') loadRulesConfig();
 
     // Update URL without reload
@@ -315,8 +315,8 @@ async function deleteAllLogFiles() {
                 } else {
                     showToast('Failed to delete all sessions', 'error');
                 }
-            } catch (error) {
-                showToast('Error communicating with server', 'error');
+            } catch (e) {
+                showToast(`Connection Error: ${e.message || 'Server unreachable'}`, 'error');
             }
         }
     );
@@ -385,8 +385,8 @@ async function exportSelectedLogs() {
             const err = await response.json();
             showToast(err.error || 'Export failed', 'error');
         }
-    } catch (error) {
-        showToast('Error communicating with server', 'error');
+    } catch (e) {
+        showToast(`Connection Error: ${e.message || 'Server unreachable'}`, 'error');
     }
 }
 
@@ -419,8 +419,8 @@ async function deleteSelectedLogs() {
                 } else {
                     showToast('Failed to delete some sessions', 'error');
                 }
-            } catch (error) {
-                showToast('Error communicating with server', 'error');
+            } catch (e) {
+                showToast(`Connection Error: ${e.message || 'Server unreachable'}`, 'error');
             }
         }
     );
@@ -719,7 +719,126 @@ async function unbanIP(ip) {
                     showToast('Failed to remove ban', 'error');
                 }
             } catch (e) {
-                showToast('Error communicating with server', 'error');
+                showToast(`Connection Error: ${e.message || 'Server unreachable'}`, 'error');
+            }
+        }
+    );
+}
+
+/**
+ * Firewall (Network-Level) Ban Management
+ */
+async function loadFirewallBannedIPs() {
+    const tbody = document.getElementById('firewall-banned-ips-body');
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Checking firewall rules...</td></tr>';
+
+    try {
+        const response = await fetch('/api/firewall_banned_ips');
+        const banned = await response.json();
+
+        tbody.innerHTML = '';
+        const ips = Object.keys(banned);
+
+        if (ips.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-secondary);">No IPs are currently blocked at the firewall level.</td></tr>';
+            return;
+        }
+
+        ips.forEach(ip => {
+            const data = banned[ip];
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td style="font-family: monospace; font-weight: 600; color: #a78bfa;">${ip}</td>
+                <td style="color: var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${data.reason}">${data.reason}</td>
+                <td style="color: var(--text-secondary);">${data.timestamp}</td>
+                <td style="text-align: right;">
+                    <button class="delete-btn" onclick="unbanFirewallIP('${ip}')" title="Remove Firewall Ban" style="border-color: rgba(167,139,250,0.3); color: #a78bfa;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    } catch (e) {
+        console.error("Failed to load firewall ban list:", e);
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#ef4444;">Error loading firewall rules.</td></tr>';
+    }
+}
+
+async function manualFirewallBanIP() {
+    const ipInput = document.getElementById('fw-ban-ip-input');
+    const reasonInput = document.getElementById('fw-ban-reason-input');
+    const ip = ipInput.value.trim();
+    const reason = reasonInput.value.trim() || 'Manually blocked at network level';
+
+    if (!ip) {
+        showToast('Please enter a valid IP address', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/firewall_ban_ip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ip, reason })
+        });
+
+        const result = await response.json();
+
+        if (response.status === 403) {
+            const notice = document.getElementById('fw-admin-notice');
+            if (notice) notice.style.display = 'flex';
+            showToast('Admin privileges required — see the notice above', 'error');
+            return;
+        }
+
+        if (response.ok) {
+            const notice = document.getElementById('fw-admin-notice');
+            if (notice) notice.style.display = 'none';
+            showToast(`✓ ${ip} blocked at Windows Firewall level`, 'success');
+            ipInput.value = '';
+            reasonInput.value = '';
+            loadFirewallBannedIPs();
+        } else {
+            showToast(result.error || 'Failed to add firewall rule', 'error');
+        }
+    } catch (e) {
+        showToast(`Connection Error: ${e.message || 'Server unreachable'}`, 'error');
+    }
+}
+
+async function unbanFirewallIP(ip) {
+    showConfirmModal(
+        'Remove Firewall Block?',
+        `This will delete the Windows Firewall rules for ${ip}, allowing it to communicate with your device again. Are you sure?`,
+        'Remove Block',
+        async () => {
+            try {
+                const response = await fetch('/api/firewall_unban_ip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip })
+                });
+
+                const result = await response.json();
+
+                if (response.status === 403) {
+                    const notice = document.getElementById('fw-admin-notice');
+                    if (notice) notice.style.display = 'flex';
+                    showToast('Admin privileges required to remove firewall rules', 'error');
+                    return;
+                }
+
+                if (response.ok) {
+                    showToast(`Firewall block removed for ${ip}`, 'success');
+                    loadFirewallBannedIPs();
+                } else {
+                    showToast(result.error || 'Failed to remove firewall rule', 'error');
+                }
+            } catch (e) {
+                showToast(`Connection Error: ${e.message || 'Server unreachable'}`, 'error');
             }
         }
     );
@@ -795,7 +914,7 @@ async function saveRulesConfig() {
             showToast('Failed to save configuration', 'error');
         }
     } catch (e) {
-        showToast('Error communicating with server', 'error');
+        showToast(`Connection Error: ${e.message || 'Server unreachable'}`, 'error');
     }
 }
 
@@ -815,7 +934,7 @@ async function resetRulesConfig() {
                     showToast('Failed to reset settings', 'error');
                 }
             } catch (e) {
-                showToast('Error communicating with server', 'error');
+                showToast(`Connection Error: ${e.message || 'Server unreachable'}`, 'error');
             }
         }
     );
