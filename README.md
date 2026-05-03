@@ -2,7 +2,7 @@
 
 A custom, Python-based Network Intrusion Detection System designed to monitor network traffic, detect malicious behavior, securely log incidents using AES-256 encryption, and provide a real-time administrative dashboard.
 
-## 🚀 Features
+## Features
 
 - **Packet Sniffing**: Uses `scapy` to capture real-time network packets.
 - **Custom Rule Engine**: Detects multiple types of attacks:
@@ -18,13 +18,13 @@ A custom, Python-based Network Intrusion Detection System designed to monitor ne
 - **Web Dashboard**: Real-time web UI using Flask & SocketIO to monitor attacks, manage banned IPs, and export logs safely.
 - **Decryption Utility**: Includes a standalone, offline CLI utility (`decrypt_exported_logs.py`) to easily decrypt and view exported `.bin` logs from the dashboard.
 
-## 🛠 Prerequisites
+## Prerequisites
 
 - Python 3.8+
 - Administrator/Root privileges (required for `scapy` to capture packets and for modifying firewall rules).
 - Npcap or WinPcap (if running on Windows).
 
-## 📦 Installation
+## Installation
 
 1. Clone the repository:
    ```bash
@@ -64,7 +64,7 @@ python decrypt_exported_logs.py
 - Paste the full path to the `.bin` or `.json` file you downloaded.
 - The script will decrypt the logs, save them to a formatted JSON file, and automatically open it for you.
 
-## 🗂 Project Structure
+## Project Structure
 
 - `main.py`: Entry point for the CLI NIDS Engine.
 - `app.py`: Flask backend for the Real-time Web Dashboard.
