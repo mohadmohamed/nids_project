@@ -11,7 +11,7 @@ A custom, Python-based Network Intrusion Detection System designed to monitor ne
   - UDP Flood
   - ICMP Flood (Ping of Death)
   - Payload Inspection (SQL Injection, XSS, Path Traversal)
-- **Automated IP Banning**: Automatically blocks malicious IPs by integrating with the Windows firewall and tracking failed login attempts.
+- **Automated IP Banning**: Automatically blocks malicious IPs from accessing the admin dashboard by tracking failed login attempts.
 - **Secure Logging**: 
   - All alerts and system logs are encrypted locally using AES-256-CBC and HMAC-SHA256.
   - Logs can be exported securely to analyze offline.
