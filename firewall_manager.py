@@ -10,42 +10,50 @@ def is_admin():
         return False
 
 def ban_ip(ip_address):
-    """Adds a Windows Firewall rule to block all inbound traffic from the IP."""
-    rule_name = f"NIDS_BLOCK_{ip_address}"
+    """Adds a Windows Firewall rule to block all inbound and outbound traffic from the IP."""
+    rule_name_in = f"NIDS_BLOCK_IN_{ip_address}"
+    rule_name_out = f"NIDS_BLOCK_OUT_{ip_address}"
     
-    # PowerShell command via netsh to block the IP
-    command = [
+    command_in = [
         "netsh", "advfirewall", "firewall", "add", "rule",
-        f"name={rule_name}",
-        "dir=in",
-        "action=block",
-        f"remoteip={ip_address}"
+        f"name={rule_name_in}", "dir=in", "action=block", f"remoteip={ip_address}"
+    ]
+    command_out = [
+        "netsh", "advfirewall", "firewall", "add", "rule",
+        f"name={rule_name_out}", "dir=out", "action=block", f"remoteip={ip_address}"
     ]
     
-    print(f"[*] Adding Windows Firewall rule to block inbound traffic from {ip_address}...")
-    result = subprocess.run(command, capture_output=True, text=True)
+    print(f"[*] Adding Windows Firewall rules to block all traffic for {ip_address}...")
+    res_in = subprocess.run(command_in, capture_output=True, text=True)
+    res_out = subprocess.run(command_out, capture_output=True, text=True)
     
-    if result.returncode == 0:
-        print(f"[+] SUCCESS: {ip_address} is now completely blocked at the network level.")
+    if res_in.returncode == 0 and res_out.returncode == 0:
+        print(f"[+] SUCCESS: {ip_address} is now completely blocked at the network level (Inbound & Outbound).")
     else:
-        print(f"[-] FAILED to add rule. Error details: {result.stdout.strip()}")
+        print(f"[-] FAILED to add rules.")
+        if res_in.returncode != 0: print(f"Inbound Error: {res_in.stdout.strip()}")
+        if res_out.returncode != 0: print(f"Outbound Error: {res_out.stdout.strip()}")
 
 def unban_ip(ip_address):
-    """Removes the Windows Firewall rule for the IP."""
-    rule_name = f"NIDS_BLOCK_{ip_address}"
+    """Removes the Windows Firewall rules for the IP."""
+    rule_name_in = f"NIDS_BLOCK_IN_{ip_address}"
+    rule_name_out = f"NIDS_BLOCK_OUT_{ip_address}"
     
-    command = [
-        "netsh", "advfirewall", "firewall", "delete", "rule",
-        f"name={rule_name}"
+    command_in = [
+        "netsh", "advfirewall", "firewall", "delete", "rule", f"name={rule_name_in}"
+    ]
+    command_out = [
+        "netsh", "advfirewall", "firewall", "delete", "rule", f"name={rule_name_out}"
     ]
     
-    print(f"[*] Removing Windows Firewall rule for {ip_address}...")
-    result = subprocess.run(command, capture_output=True, text=True)
+    print(f"[*] Removing Windows Firewall rules for {ip_address}...")
+    res_in = subprocess.run(command_in, capture_output=True, text=True)
+    res_out = subprocess.run(command_out, capture_output=True, text=True)
     
-    if result.returncode == 0 and "No rules match" not in result.stdout:
+    if res_in.returncode == 0 or "No rules match" in res_in.stdout:
         print(f"[+] SUCCESS: {ip_address} has been unblocked from the Windows Firewall.")
     else:
-        print(f"[-] Rule not found or failed to delete. {result.stdout.strip()}")
+        print(f"[-] Failed to delete rule. {res_in.stdout.strip()}")
 
 if __name__ == "__main__":
     if not is_admin():
