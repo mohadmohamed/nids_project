@@ -37,7 +37,7 @@ A custom, Python-based Network Intrusion Detection System designed to monitor ne
    pip install -r requirements.txt
    ```
 
-## ⚙️ Running the System
+## Running the System
 
 ### 1. Starting the Admin Dashboard
 The Admin Dashboard provides real-time visibility into alerts and allows you to configure rules and export logs.
@@ -79,5 +79,5 @@ python decrypt_exported_logs.py
 - `config.json` & `rules_config.json`: Configuration state for rules, credentials, and settings.
 - `templates/` & `static/`: Frontend files for the Web Dashboard.
 
-## 🔒 Security Note
+## Security Note
 This system encrypts logs using a PBKDF2 derived key from your Admin password. If you lose your Admin password, previous logs cannot be recovered.
