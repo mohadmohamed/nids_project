@@ -58,7 +58,17 @@ python main.py
 - On startup, it will ask for the **Admin Dashboard Password** to secure the session log files.
 - Select `1` from the menu to start capturing traffic. 
 
-### 3. Decrypting Exported Logs Offline
+### 3. Manual Network-Level IP Banning
+If you want to completely block an attacker from communicating with your computer at the network level (dropping their packets before they even reach the server), you can manually add a Windows Firewall rule. **Must be run as Administrator!**
+```bash
+python firewall_manager.py ban <IP_ADDRESS>
+```
+To unban them later:
+```bash
+python firewall_manager.py unban <IP_ADDRESS>
+```
+
+### 4. Decrypting Exported Logs Offline
 If you exported a `.bin` log file from the dashboard, you can decrypt it offline:
 ```bash
 python decrypt_exported_logs.py
