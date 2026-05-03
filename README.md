@@ -45,7 +45,10 @@ The Admin Dashboard provides real-time visibility into alerts and allows you to 
 python app.py
 ```
 - Open your browser and navigate to the address shown in the terminal (usually `http://127.0.0.1:5000`).
-- You will be prompted to log in. (Check the `config.json` for default admin credentials, or you will be asked to set them up on the first run).
+- You will be prompted to log in. By default (if no `config.json` is present), the credentials are:
+  - **Username:** `admin_nids`
+  - **Password:** `123`
+- *Note: You should change this password immediately after logging in from the dashboard settings!*
 
 ### 2. Starting the NIDS Engine
 The NIDS engine actively monitors network interfaces for suspicious activity. **Must be run as Administrator!**
