@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+logs/*.bin
+logs/*.json
+logs/*.log
+!logs/.gitkeep
+.env

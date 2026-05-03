@@ -1,0 +1,40 @@
+{
+  "time_window": 10,
+  "icmp_flood": {
+    "standard": 30,
+    "trusted": 100
+  },
+  "syn_flood": {
+    "standard": 30,
+    "trusted": 80
+  },
+  "common_port_traffic": {
+    "standard": 800,
+    "trusted": 1500
+  },
+  "ddos": {
+    "standard": 2000,
+    "trusted": 5000
+  },
+  "port_scan": {
+    "standard": 25,
+    "trusted": 40
+  },
+  "common_ports": [
+    80,
+    443,
+    22,
+    21,
+    53,
+    3306,
+    3389,
+    8080
+  ],
+  "trusted_ip_prefixes": [
+    "142.250.",
+    "172.217.",
+    "142.251.",
+    "8.8.8.",
+    "8.8.4."
+  ]
+}
